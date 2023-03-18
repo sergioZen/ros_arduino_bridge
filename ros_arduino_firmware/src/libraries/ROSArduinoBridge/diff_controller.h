@@ -124,6 +124,11 @@ void updatePID() {
   doPID(&rightPID);
   doPID(&leftPID);
 
+  Serial.print("Left: ");
+  Serial.print(leftPID.output);
+  Serial.print("Right: ");
+  Serial.println(rightPID.output);
+
   /* Set the motor speeds accordingly */
   setMotorSpeeds(leftPID.output, rightPID.output);
 }

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """
     A Python driver for the Arduino microcontroller running the
@@ -21,7 +21,7 @@
 
 """
 
-import thread
+import _thread
 from math import pi as PI, degrees, radians
 import os
 import time
@@ -51,7 +51,7 @@ class Arduino:
         self.interCharTimeout = timeout / 30.
         self.motors_reversed = motors_reversed
         # Keep things thread safe
-        self.mutex = thread.allocate_lock()
+        self.mutex = _thread.allocate_lock()
 
         # An array to cache analog sensor readings
         self.analog_sensor_cache = [None] * self.N_ANALOG_PORTS
@@ -61,7 +61,7 @@ class Arduino:
 
     def connect(self):
         try:
-            print "Connecting to Arduino on port", self.port, "..."
+            print("Connecting to Arduino on port" + self.port)
             self.port = Serial(port=self.port, baudrate=self.baudrate, timeout=self.timeout, writeTimeout=self.writeTimeout)
             # The next line is necessary to give the firmware time to wake up.
             time.sleep(1)
@@ -71,15 +71,15 @@ class Arduino:
                 test = self.get_baud()
                 if test != self.baudrate:
                     raise SerialException
-            print "Connected at", self.baudrate
-            print "Arduino is ready."
+            print("Connected at", self.baudrate)
+            print("Arduino is ready.")
 
         except SerialException:
-            print "Serial Exception:"
-            print sys.exc_info()
-            print "Traceback follows:"
+            print("Serial Exception:")
+            print(sys.exc_info())
+            print("Traceback follows:")
             traceback.print_exc(file=sys.stdout)
-            print "Cannot connect to Arduino!"
+            print("Cannot connect to Arduino!")
             os._exit(1)
 
     def open(self):
@@ -96,7 +96,7 @@ class Arduino:
         ''' This command should not be used on its own: it is called by the execute commands
             below in a thread safe manner.
         '''
-        self.port.write(cmd + '\r')
+        self.port.write(str.encode(cmd + '\r'))
 
     def recv(self, timeout=0.5):
         timeout = min(timeout, self.timeout)
@@ -106,13 +106,12 @@ class Arduino:
         '''
         c = ''
         value = ''
-        attempts = 0
         while c != '\r':
-            c = self.port.read(1)
+            c = self.port.read(1).decode("utf-8")
+            if (c == ''):
+                print("Error: Serial timeout on command: ")
+                return ''
             value += c
-            attempts += 1
-            if attempts * self.interCharTimeout > timeout:
-                return None
 
         value = value.strip('\r')
 
@@ -140,8 +139,8 @@ class Arduino:
             below in a thread safe manner.
         '''
         try:
-            values = self.recv(self.timeout * self.N_ANALOG_PORTS).split()
-            return map(int, values)
+            resp = self.recv(self.timeout * self.N_ANALOG_PORTS).split()
+            return resp
         except:
             return []
 
@@ -159,19 +158,19 @@ class Arduino:
         attempts = 0
 
         try:
-            self.port.write(cmd + '\r')
+            self.port.write(str.encode(cmd + '\r'))
             value = self.recv(self.timeout)
             while attempts < ntries and (value == '' or value == 'Invalid Command' or value == None):
                 try:
                     self.port.flushInput()
-                    self.port.write(cmd + '\r')
+                    self.port.write(str.encode(cmd + '\r'))
                     value = self.recv(self.timeout)
                 except:
-                    print "Exception executing command: " + cmd
+                    print("Exception executing command: " + cmd)
                 attempts += 1
         except:
             self.mutex.release()
-            print "Exception executing command: " + cmd
+            print("Exception executing command: " + cmd)
             value = None
 
         self.mutex.release()
@@ -191,24 +190,24 @@ class Arduino:
         attempts = 0
 
         try:
-            self.port.write(cmd + '\r')
-            values = self.recv_array()
-            while attempts < ntries and (values == '' or values == 'Invalid Command' or values == [] or values == None):
+            self.port.write(str.encode(cmd + '\r'))
+            resp = self.recv_array()
+            while attempts < ntries and (resp == '' or resp == 'Invalid Command' or resp == [] or resp == None):
                 try:
                     self.port.flushInput()
-                    self.port.write(cmd + '\r')
-                    values = self.recv_array()
+                    self.port.write(str.encode(cmd + '\r'))
+                    resp = self.recv_array()
                 except:
                     print("Exception executing command: " + cmd)
                 attempts += 1
         except:
             self.mutex.release()
-            print "Exception executing command: " + cmd
+            print("Exception executing command: " + cmd)
             raise SerialException
             return []
 
         try:
-            values = map(int, values)
+            values = resp
         except:
             values = []
 
@@ -229,20 +228,20 @@ class Arduino:
         attempts = 0
 
         try:
-            self.port.write(cmd + '\r')
+            self.port.write(str.encode(cmd + '\r'))
             ack = self.recv(self.timeout)
             while attempts < ntries and (ack == '' or ack == 'Invalid Command' or ack == None):
                 try:
                     self.port.flushInput()
-                    self.port.write(cmd + '\r')
+                    self.port.write(str.encode(cmd + '\r'))
                     ack = self.recv(self.timeout)
                 except:
-                    print "Exception executing command: " + cmd
+                    print("Exception executing command: " + cmd)
             attempts += 1
         except:
             self.mutex.release()
-            print "execute_ack exception when executing", cmd
-            print sys.exc_info()
+            print("execute_ack exception when executing" + cmd)
+            print( sys.exc_info())
             return 0
 
         self.mutex.release()
@@ -251,7 +250,7 @@ class Arduino:
     def update_pid(self, Kp, Kd, Ki, Ko):
         ''' Set the PID parameters on the Arduino
         '''
-        print "Updating PID parameters"
+        print("Updating PID parameters")
         cmd = 'u ' + str(Kp) + ':' + str(Kd) + ':' + str(Ki) + ':' + str(Ko)
         self.execute_ack(cmd)
 
@@ -266,12 +265,15 @@ class Arduino:
     def get_encoder_counts(self):
         values = self.execute_array('e')
         if len(values) != 2:
-            print "Encoder count was not 2"
+            print("Encoder count was not 2")
             raise SerialException
             return None
         else:
             if self.motors_reversed:
                 values[0], values[1] = -values[0], -values[1]
+
+            values[0] = int(values[0])
+            values[1] = int(values[1])
             return values
 
     def reset_encoders(self):
@@ -352,7 +354,7 @@ class Arduino:
 """ Basic test for connectivity """
 if __name__ == "__main__":
     if os.name == "posix":
-        portName = "/dev/ttyACM0"
+        portName = "/dev/ttyUSB0"
     else:
         portName = "COM43" # Windows style COM port.
 
@@ -361,20 +363,20 @@ if __name__ == "__main__":
     myArduino = Arduino(port=portName, baudrate=baudRate, timeout=0.5)
     myArduino.connect()
 
-    print "Sleeping for 1 second..."
+    print("Sleeping for 1 second...")
     time.sleep(1)
 
-    print "Reading on analog port 0", myArduino.analog_read(0)
-    print "Reading on digital port 0", myArduino.digital_read(0)
-    print "Blinking the LED 3 times"
+    print("Reading on analog port 0", myArduino.analog_read(0))
+    print("Reading on digital port 0", myArduino.digital_read(0))
+    print("Blinking the LED 3 times")
     for i in range(3):
         myArduino.digital_write(13, 1)
         time.sleep(1.0)
-    #print "Current encoder counts", myArduino.encoders()
+    #print("Current encoder counts", myArduino.encoders()
 
-    print "Connection test successful.",
+    print("Connection test successful.")
 
     myArduino.stop()
     myArduino.close()
 
-    print "Shutting down Arduino."
+    print("Shutting down Arduino.")
