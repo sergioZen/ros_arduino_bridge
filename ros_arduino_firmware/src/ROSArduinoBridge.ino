@@ -104,7 +104,7 @@
   #include "diff_controller.h"
 
   /* Run the PID loop at 30 times per second */
-  #define PID_RATE           30     // Hz
+  #define PID_RATE           2     //SBR estaba con 30 //Hz
 
   /* Convert the rate into an interval */
   const int PID_INTERVAL = 1000 / PID_RATE;
@@ -217,9 +217,9 @@ int runCommand() {
     else moving = 1;
     leftPID.TargetTicksPerFrame = arg1;
     rightPID.TargetTicksPerFrame = arg2;
-    Serial.print("Left speed: ");
+    //SBR:Serial.print("Left speed: ");
     Serial.print(arg1);
-    Serial.print(" Right speed: ");
+    //SBR:Serial.print(" Right speed: ");
     Serial.print(arg2);
     Serial.print(" ");
     Serial.println("OK"); 
